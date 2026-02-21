@@ -43,10 +43,14 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
+# The WHO Taleo careers portal migrated from who.taleo.net to careers.who.int.
+# The RSS feed URL is the standard Taleo job-search URL with &rss=true appended.
+# To find/verify this URL: go to https://careers.who.int/careersection/ex/jobsearch.ftl,
+# run a search, then click the RSS icon in the results page to copy the live feed URL.
 FEED_URL = (
-    "http://who.taleo.net/careersection/careersection/common/search/"
-    "jobsearch.ftl?lang=en&portal=101430233&searchtype=3"
-    "&f=null&s=3|D&a=null&multiline=true"
+    "https://careers.who.int/careersection/ex/jobsearch.ftl"
+    "?lang=en&portal=101430233&searchtype=3"
+    "&f=null&s=3|D&a=null&multiline=true&rss=true"
 )
 FETCH_DETAIL   = True   # Set False to skip HTTP detail-page fetching (faster, less accurate)
 REQUEST_DELAY  = 0.5    # Seconds between detail-page requests (be polite)
@@ -307,7 +311,8 @@ def build_filtered_rss(original_xml: str, accepted: list[FeedItem]) -> str:
         if link not in accepted_links:
             channel.remove(elem)
     ET.indent(root, space="  ")
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    # encoding="utf-8" returns bytes with a correct <?xml ... encoding='utf-8'?> declaration.
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 # ─────────────────────────────────────────────────────────────────────────────
 # SELF-CONTAINED UNIT TESTS  (run with: python who_feed_filter.py --test)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -417,7 +422,7 @@ if __name__ == "__main__":
     print_results(accepted, rejected)
     # Optionally write filtered feed to disk
     filtered_rss = build_filtered_rss(xml_source, accepted)
-    out_path = "who_filtered_feed.xml"
+    out_path = "output/who_filtered_feed.xml"
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(filtered_rss)
     log.info("Filtered RSS written to %s", out_path)
