@@ -4,11 +4,13 @@ on:
     - cron: '0 7 * * 1'
     - cron: '0 7 * * 4'
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   filter:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -19,10 +21,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run filter
-        run: python filter/who_feed_filter.py
+        run: python who_feed_filter.py
       - name: Commit and push if changes
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add who_filtered_feed.xml
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update WHO filtered feed - $(date +'%Y-%m-%d %H:%M UTC')" && git push)
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update WHO filtered feed - $(date +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi

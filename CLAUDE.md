@@ -43,11 +43,9 @@ who-feed-filter/
 ├── .github/
 │   └── workflows/
 │       └── run_filter.yml        # GitHub Actions schedule and job definition
-├── filter/
-│   ├── __init__.py
-│   └── who_feed_filter.py        # Main filter script
 ├── tests/
 │   └── test_filter.py            # Unit tests (pytest)
+├── who_feed_filter.py            # Main filter script
 ├── who_filtered_feed.xml         # Generated output (auto-updated by Actions)
 ├── CLAUDE.md                     # Context file for Claude Code
 ├── requirements.txt
@@ -65,10 +63,10 @@ cd who-feed-filter
 pip install -r requirements.txt
 
 # Run built-in unit tests (no HTTP requests)
-python filter/who_feed_filter.py --test
+python who_feed_filter.py --test
 
 # Run full filter (fetches detail pages — takes ~1–2 min)
-python filter/who_feed_filter.py
+python who_feed_filter.py
 ```
 
 The filtered feed is written to `who_filtered_feed.xml`.
@@ -84,7 +82,7 @@ pytest tests/
 
 ## Configuration
 
-All configuration options are at the top of `filter/who_feed_filter.py`:
+All configuration options are at the top of `who_feed_filter.py`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|

@@ -3,7 +3,7 @@ Tests for the WHO RSS Feed Filter.
 Uses the same test cases as the inline --test runner but in pytest format.
 """
 import pytest
-from filter.who_feed_filter import (
+from who_feed_filter import (
     FeedItem,
     should_import,
     check_excluded,
