@@ -25,7 +25,7 @@ Because the WHO Taleo feed often serves empty or truncated `<description>` field
 1. **Pre-filter on title** — fast exclusion of obvious mismatches (wrong role type, wrong grade in title)
 2. **Detail page fetch** — the actual job page is fetched and parsed for structured fields like `Duty Station` and `Grade`, which are reliably present in the HTML
 
-The output is a valid filtered RSS file written to `output/who_filtered_feed.xml`, which is automatically committed back to this repository after each run.
+The output is a valid filtered RSS file written to `who_filtered_feed.xml` (at the repository root), which is automatically committed back to this repository after each run.
 
 ---
 
@@ -45,11 +45,11 @@ who-feed-filter/
 │   └── workflows/
 │       └── run_filter.yml        # GitHub Actions schedule and job definition
 ├── filter/
+│   ├── __init__.py
 │   └── who_feed_filter.py        # Main filter script
-├── output/
-│   └── who_filtered_feed.xml     # Generated output (auto-updated by Actions)
 ├── tests/
-│   └── test_filter.py            # Unit tests
+│   └── test_filter.py            # Unit tests (pytest)
+├── who_filtered_feed.xml         # Generated output (auto-updated by Actions)
 ├── CLAUDE.md                     # Context file for Claude Code
 ├── requirements.txt
 └── README.md
@@ -72,7 +72,7 @@ python filter/who_feed_filter.py --test
 python filter/who_feed_filter.py
 ```
 
-The filtered feed is written to `output/who_filtered_feed.xml`.
+The filtered feed is written to `who_filtered_feed.xml`.
 
 ---
 
