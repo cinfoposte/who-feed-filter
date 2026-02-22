@@ -7,14 +7,10 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   filter:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.commit.outputs.changed }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -25,22 +21,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run filter
-        run: python filter/who_feed_filter.py
+        run: python who_feed_filter.py
       - name: Commit and push if changes
-        id: commit
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add who_filtered_feed.xml
           if git diff --quiet && git diff --staged --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to commit"
           else
             git commit -m "Update WHO filtered feed - $(date +'%Y-%m-%d %H:%M UTC')"
             git push
-            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-
-  deploy-pages:
-    needs: filter
-    if: always() && (needs.filter.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/deploy-pages.yml
