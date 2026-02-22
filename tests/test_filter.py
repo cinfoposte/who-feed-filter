@@ -11,6 +11,8 @@ from who_feed_filter import (
     check_location,
     parse_feed,
     build_filtered_rss,
+    validate_rss_response,
+    _EMPTY_RSS,
 )
 
 
@@ -194,3 +196,59 @@ def test_build_filtered_rss():
     assert "Health Officer, P4, Geneva" in rss
     assert "Admin Clerk, GS-4, Manila" not in rss
     assert "More Jobs Available" not in rss
+
+
+# ── Response validation tests ───────────────────────────────────────────────
+
+def test_validate_rss_response_valid_xml():
+    xml = '<?xml version="1.0"?><rss><channel></channel></rss>'
+    assert validate_rss_response(xml) == xml
+
+
+def test_validate_rss_response_rss_root():
+    xml = '<rss version="2.0"><channel></channel></rss>'
+    assert validate_rss_response(xml) == xml
+
+
+def test_validate_rss_response_empty():
+    with pytest.raises(ValueError, match="Empty response"):
+        validate_rss_response("")
+
+
+def test_validate_rss_response_whitespace():
+    with pytest.raises(ValueError, match="Empty response"):
+        validate_rss_response("   \n  ")
+
+
+def test_validate_rss_response_html():
+    html = "<html><head><title>Login</title></head><body>Please log in</body></html>"
+    with pytest.raises(ValueError, match="HTML, not RSS"):
+        validate_rss_response(html)
+
+
+def test_validate_rss_response_doctype_html():
+    html = "<!DOCTYPE html><html><body>Error</body></html>"
+    with pytest.raises(ValueError, match="HTML, not RSS"):
+        validate_rss_response(html)
+
+
+# ── Graceful parse failure tests ────────────────────────────────────────────
+
+def test_parse_feed_invalid_xml():
+    """parse_feed should return empty list on invalid XML, not crash."""
+    items = parse_feed("this is not xml at all")
+    assert items == []
+
+
+def test_parse_feed_html_response():
+    """parse_feed should handle HTML gracefully."""
+    html = "<html><body><p>Not an RSS feed</p></body></html>"
+    items = parse_feed(html)
+    assert items == []
+
+
+def test_build_filtered_rss_invalid_xml():
+    """build_filtered_rss should return empty RSS on invalid original XML."""
+    rss = build_filtered_rss("not xml", [])
+    assert "<?xml" in rss
+    assert "<rss" in rss

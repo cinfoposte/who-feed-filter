@@ -244,9 +244,39 @@ def should_import(item: FeedItem) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 # FEED PARSING
 # ─────────────────────────────────────────────────────────────────────────────
+def validate_rss_response(text: str) -> str:
+    """
+    Check that the response looks like XML/RSS before parsing.
+    Returns the (possibly trimmed) XML string, or raises ValueError
+    with a diagnostic message if it's clearly not RSS.
+    """
+    stripped = text.strip()
+    if not stripped:
+        raise ValueError("Empty response body")
+    # Check for XML declaration or root RSS/feed element
+    if stripped[:5] == "<?xml" or stripped[:4] in ("<rss", "<fee"):
+        return text
+    # HTML response (login page, JS redirect, error page)
+    if "<html" in stripped[:500].lower() or "<!doctype" in stripped[:500].lower():
+        # Extract a snippet for logging
+        snippet = stripped[:300].replace("\n", " ")
+        raise ValueError(
+            f"Response is HTML, not RSS/XML. The WHO portal may have returned "
+            f"a login page or redirect. First 300 chars: {snippet}"
+        )
+    # Unknown format — try anyway, ET.fromstring will give a clear error
+    return text
+
+
 def parse_feed(xml_source: str) -> list[FeedItem]:
     """Parse RSS XML string and return list of FeedItem."""
-    root = ET.fromstring(xml_source)
+    try:
+        root = ET.fromstring(xml_source)
+    except ET.ParseError as exc:
+        log.error("Failed to parse feed XML: %s", exc)
+        snippet = xml_source[:300].replace("\n", " ")
+        log.error("Response starts with: %s", snippet)
+        return []
     ns   = {"content": "http://purl.org/rss/1.0/modules/content/"}
     items = []
     for elem in root.findall(".//item"):
@@ -301,18 +331,34 @@ def print_results(accepted: list[FeedItem], rejected: list[FeedItem]) -> None:
         print(f"  ❌  {item.title}")
         print(f"       Reason: {item.reason}")
     print()
+_EMPTY_RSS = (
+    '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n'
+    '<rss version="2.0">\n'
+    '  <channel>\n'
+    '    <title>WHO Filtered Feed (cinfo)</title>\n'
+    '    <link>https://careers.who.int</link>\n'
+    '    <description>Geneva-based Professional/Director WHO vacancies</description>\n'
+    '  </channel>\n'
+    '</rss>\n'
+)
+
+
 def build_filtered_rss(original_xml: str, accepted: list[FeedItem]) -> str:
     """Re-emit a valid RSS feed containing only accepted items."""
-    accepted_links = {item.link for item in accepted}
-    root   = ET.fromstring(original_xml)
-    channel = root.find("channel")
-    for elem in list(channel.findall("item")):
-        link = (elem.findtext("link") or "").strip()
-        if link not in accepted_links:
-            channel.remove(elem)
-    ET.indent(root, space="  ")
-    # encoding="utf-8" returns bytes with a correct <?xml ... encoding='utf-8'?> declaration.
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    try:
+        accepted_links = {item.link for item in accepted}
+        root   = ET.fromstring(original_xml)
+        channel = root.find("channel")
+        for elem in list(channel.findall("item")):
+            link = (elem.findtext("link") or "").strip()
+            if link not in accepted_links:
+                channel.remove(elem)
+        ET.indent(root, space="  ")
+        # encoding="utf-8" returns bytes with a correct <?xml ... encoding='utf-8'?> declaration.
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    except ET.ParseError:
+        log.warning("Cannot rebuild RSS from original XML; writing empty feed.")
+        return _EMPTY_RSS
 # ─────────────────────────────────────────────────────────────────────────────
 # SELF-CONTAINED UNIT TESTS  (run with: python who_feed_filter.py --test)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -408,21 +454,49 @@ if __name__ == "__main__":
     if not HAS_REQUESTS:
         log.error("requests library not found. Install with: pip install requests")
         sys.exit(1)
+
+    out_path = "who_filtered_feed.xml"
     session = _make_session()
+
+    # --- Fetch feed ---
     log.info("Fetching WHO RSS feed …")
+    xml_source = None
     try:
-        resp = session.get(FEED_URL, timeout=20)
+        resp = session.get(FEED_URL, timeout=30)
         resp.raise_for_status()
         xml_source = resp.text
+        log.info("Feed fetched: HTTP %s, Content-Type: %s, %d bytes",
+                 resp.status_code,
+                 resp.headers.get("Content-Type", "unknown"),
+                 len(xml_source))
     except Exception as exc:
         log.error("Failed to fetch feed: %s", exc)
-        sys.exit(1)
-    log.info("Processing feed items …")
-    accepted, rejected = process_feed(xml_source)
-    print_results(accepted, rejected)
-    # Optionally write filtered feed to disk
-    filtered_rss = build_filtered_rss(xml_source, accepted)
-    out_path = "who_filtered_feed.xml"
+
+    # --- Validate & process ---
+    accepted, rejected = [], []
+    if xml_source:
+        try:
+            xml_source = validate_rss_response(xml_source)
+        except ValueError as exc:
+            log.error("Feed validation failed: %s", exc)
+            xml_source = None
+
+    if xml_source:
+        log.info("Processing feed items …")
+        accepted, rejected = process_feed(xml_source)
+        print_results(accepted, rejected)
+
+    # --- Write output ---
+    if xml_source and (accepted or rejected):
+        filtered_rss = build_filtered_rss(xml_source, accepted)
+    else:
+        if not xml_source:
+            log.warning("Feed unavailable — writing empty RSS placeholder.")
+        else:
+            log.warning("Feed returned no items — writing empty RSS.")
+        filtered_rss = _EMPTY_RSS
+
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(filtered_rss)
-    log.info("Filtered RSS written to %s", out_path)
+    log.info("Filtered RSS written to %s (%d accepted, %d rejected)",
+             out_path, len(accepted), len(rejected))
