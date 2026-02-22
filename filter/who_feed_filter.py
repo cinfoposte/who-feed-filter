@@ -422,7 +422,7 @@ if __name__ == "__main__":
     print_results(accepted, rejected)
     # Optionally write filtered feed to disk
     filtered_rss = build_filtered_rss(xml_source, accepted)
-    out_path = "output/who_filtered_feed.xml"
+    out_path = "who_filtered_feed.xml"
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(filtered_rss)
     log.info("Filtered RSS written to %s", out_path)
