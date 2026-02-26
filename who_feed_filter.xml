@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss version="2.0">
+  <channel>
+    <title>WHO Geneva Professional/Director Vacancies (filtered by cinfo)</title>
+    <link>https://cinfoposte.github.io/who-feed-filter/who_feed_filter.xml</link>
+    <description>Filtered WHO job feed: Geneva-based positions at Professional and Director grade (P1-P6, D1-D2). Source: WHO Careers RSS.</description>
+    <lastBuildDate>Thu, 01 Jan 1970 00:00:00 +0000</lastBuildDate>
+  </channel>
+</rss>
