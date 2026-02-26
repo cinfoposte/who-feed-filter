@@ -2,8 +2,10 @@
 
 Automated filter for the [WHO Careers RSS feed](https://careers.who.int) that extracts only the jobs relevant to cinfo's job portal: **Geneva-based positions at Professional and Director grade (P1–P6, D1–D2)**.
 
-The live filtered feed is accessible at:
-`https://cinfoposte.github.io/who-feed-filter/who_filtered_feed.xml`
+The filtered feed is republished via GitHub Pages at:
+**https://cinfoposte.github.io/who-feed-filter/who_feed_filter.xml**
+
+Subscribe to this URL in any RSS reader to receive only matching WHO vacancies.
 
 ## What It Does
 
@@ -19,16 +21,25 @@ The following role types are always excluded regardless of grade or location: Co
 
 Because the WHO Taleo feed often serves empty or truncated `<description>` fields, the filter operates in two stages:
 
-1. **Pre-filter on title** — fast exclusion of obvious mismatches (wrong role type, wrong grade in title)
-2. **Detail page fetch** — the actual job page is fetched and parsed for structured fields like `Duty Station` and `Grade`, which are reliably present in the HTML
+1. **Stage 1 — Pre-filter on title** — fast exclusion of obvious mismatches (excluded role types like SSA, Consultant, Intern)
+2. **Stage 2 — Detail page fetch** — the actual job page is fetched via HTTP and parsed for structured fields like `Duty Station` and `Grade`, which are reliably present in the HTML
 
-The output is a valid filtered RSS file written to `who_filtered_feed.xml`, which is automatically committed back to this repository and served via GitHub Pages.
+The scraper (`scraper.py`) downloads the upstream feed, applies the filter logic from `who_feed_filter.py`, and writes a clean RSS 2.0 file to `who_feed_filter.xml`. GitHub Actions commits and pushes changes automatically, and GitHub Pages serves the file as a public feed URL.
+
+## Upstream Source
+
+The upstream data comes from the official WHO Careers RSS feed:
+```
+https://careers.who.int/careersection/ex/jobsearch.ftl?lang=en&portal=101430233&searchtype=3&f=null&s=3|D&a=null&multiline=true&rss=true
+```
+
+The upstream URL can be overridden via the `WHO_FEED_URL` environment variable.
 
 ## Schedule
 
-The workflow runs on **Mondays and Thursdays at 07:00 UTC** (08:00 Swiss time / 09:00 Swiss summer time).
+The scraper workflow runs **daily at 07:00 UTC** (08:00 Swiss time / 09:00 Swiss summer time).
 
-You can also trigger it manually at any time via the **Actions** tab → **WHO Feed Filter** → **Run workflow**.
+You can also trigger it manually at any time via the **Actions** tab → **WHO Feed Scraper** → **Run workflow**.
 
 ## Repository Structure
 
@@ -36,12 +47,15 @@ You can also trigger it manually at any time via the **Actions** tab → **WHO F
 who-feed-filter/
 ├── .github/
 │   └── workflows/
-│       └── run_filter.yml        # GitHub Actions schedule and job definition
+│       ├── run_filter.yml        # Legacy workflow (Mon/Thu)
+│       └── scrape.yml            # Daily scraper workflow
 ├── tests/
 │   └── test_filter.py            # Unit tests (pytest)
-├── who_feed_filter.py            # Main filter script
-├── who_filtered_feed.xml         # Generated output (auto-updated by Actions)
+├── scraper.py                    # Scraper entry point (fetches + filters + writes RSS)
+├── who_feed_filter.py            # Filter logic (regexes, grade/location checks)
+├── who_feed_filter.xml           # Filtered output (auto-updated, served via Pages)
 ├── requirements.txt
+├── CLAUDE.md
 └── README.md
 ```
 
@@ -53,30 +67,28 @@ git clone https://github.com/cinfoposte/who-feed-filter.git
 cd who-feed-filter
 pip install -r requirements.txt
 
+# Run the scraper (fetches upstream feed, writes who_feed_filter.xml)
+python scraper.py
+
+# Override upstream URL if needed
+WHO_FEED_URL="https://example.com/feed.xml" python scraper.py
+
 # Run built-in unit tests (no HTTP requests)
 python who_feed_filter.py --test
 
-# Run full filter (fetches detail pages — takes ~1–2 min)
-python who_feed_filter.py
-```
-
-The filtered feed is written to `who_filtered_feed.xml`.
-
-You can also run the pytest suite:
-
-```bash
+# Run pytest suite
 pip install pytest
 pytest tests/
 ```
 
-## Configuration
+The filtered feed is written to `who_feed_filter.xml` in the repository root.
 
-All configuration options are at the top of `who_feed_filter.py`:
+## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FEED_URL` | WHO Careers URL | Source feed to filter |
-| `FETCH_DETAIL` | `True` | Fetch job detail pages for richer parsing |
+| `WHO_FEED_URL` (env var) | WHO Careers RSS URL | Override the upstream feed URL |
+| `FETCH_DETAIL` | `True` | Fetch job detail pages for richer parsing (in `who_feed_filter.py`) |
 | `REQUEST_DELAY` | `0.5` | Seconds between detail page requests |
 | `LOG_LEVEL` | `INFO` | Python logging level |
 
@@ -86,16 +98,22 @@ To serve the filtered feed as a public URL:
 
 1. Go to **Settings** → **Pages**
 2. Under **Source**, select **Deploy from a branch**
-3. Choose branch `main`, folder `/ (root)`
+3. Choose branch **main**, folder **/ (root)**
 4. Click **Save**
 
-The feed will be available at `https://cinfoposte.github.io/who-feed-filter/who_filtered_feed.xml`
+After a few minutes, the feed will be available at:
+```
+https://cinfoposte.github.io/who-feed-filter/who_feed_filter.xml
+```
+
+> **Note:** The exact URL depends on your GitHub Pages configuration. If you use a custom domain, adjust the URL accordingly. The repository must be public (or have Pages enabled for private repos on a paid plan) for the feed to be accessible.
 
 ## Built With
 
 - Python 3.12
 - [requests](https://docs.python-requests.org/) for HTTP
 - GitHub Actions for scheduling
+- GitHub Pages for feed hosting
 
 ---
 
